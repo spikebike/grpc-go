@@ -39,8 +39,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"time"
 
 	"golang.org/x/net/context"
@@ -156,6 +158,16 @@ func randomPoint(r *rand.Rand) *pb.Point {
 	return &pb.Point{Latitude: lat, Longitude: long}
 }
 
+type myCreds struct {
+	credentials.TransportCredentials
+}
+
+func (mc *myCreds) ClientHandshake(ctx context.Context, str string, conn net.Conn) (c net.Conn, ai credentials.AuthInfo, err error) {
+	c, ai, err = mc.TransportCredentials.ClientHandshake(ctx, str, conn)
+	fmt.Printf("Transport creds after ClientHandshake: %#v", ai)
+	return
+}
+
 func main() {
 	flag.Parse()
 	var opts []grpc.DialOption
@@ -174,7 +186,7 @@ func main() {
 		} else {
 			creds = credentials.NewClientTLSFromCert(nil, sn)
 		}
-		opts = append(opts, grpc.WithTransportCredentials(creds))
+		opts = append(opts, grpc.WithTransportCredentials(&myCreds{creds}))
 	} else {
 		opts = append(opts, grpc.WithInsecure())
 	}
