@@ -38,6 +38,7 @@
 package main
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -46,6 +47,7 @@ import (
 	"math"
 	"net"
 	"time"
+	"crypto/tls"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -59,7 +61,7 @@ import (
 )
 
 var (
-	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	tlsflag    = flag.Bool("tls", true, "Connection uses TLS if true, else plain TCP")
 	certFile   = flag.String("cert_file", "testdata/server1.pem", "The TLS cert file")
 	keyFile    = flag.String("key_file", "testdata/server1.key", "The TLS key file")
 	jsonDBFile = flag.String("json_db_file", "testdata/route_guide_db.json", "A json file containing a list of features")
@@ -219,6 +221,22 @@ func newServer() *routeGuideServer {
 	return s
 }
 
+type myCreds struct {
+	credentials.TransportCredentials
+}
+
+func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials.AuthInfo, err error) {
+	c, ai, err = mc.TransportCredentials.ServerHandshake(rawConn)
+	tlsInfo := ai.(credentials.TLSInfo)
+//	fmt.Printf("\ntlsInfo: %#v\n", tlsInfo)
+	fmt.Printf("\nTLSUnique: %#v\n", tlsInfo.State.TLSUnique)
+	for _, v := range tlsInfo.State.PeerCertificates {
+		fmt.Println("\nServer: Client public key is:")
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+	}
+	return
+}
+
 func main() {
 	flag.Parse()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
@@ -226,12 +244,18 @@ func main() {
 		grpclog.Fatalf("failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
-	if *tls {
-		creds, err := credentials.NewServerTLSFromFile(*certFile, *keyFile)
-		if err != nil {
-			grpclog.Fatalf("Failed to generate credentials %v", err)
-		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
+	if *tlsflag {
+			  cert, err := tls.LoadX509KeyPair(*certFile,*keyFile)
+			  if err != nil {
+						 grpclog.Fatalf("server: loadkeys: %s", err)
+			  }
+			  config := tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAnyClientCert}
+			  creds := credentials.NewTLS(&config)
+			  if err != nil {
+						 grpclog.Fatalf("Failed to generate credentials %v", err)
+			  }
+			  //opts = []grpc.ServerOption{grpc.Creds(creds)}
+			  opts = []grpc.ServerOption{grpc.Creds(&myCreds{creds})}
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterRouteGuideServer(grpcServer, newServer())
