@@ -38,14 +38,14 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
 	"time"
-	"crypto/x509"
-	"crypto/tls"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -55,7 +55,7 @@ import (
 )
 
 var (
-	tlsflag                = flag.Bool("tls", true, "Connection uses TLS if true, else plain TCP")
+	tlsflag            = flag.Bool("tls", true, "Connection uses TLS if true, else plain TCP")
 	caFile             = flag.String("ca_file", "testdata/ca.pem", "The file containning the CA root cert file")
 	serverAddr         = flag.String("server_addr", "127.0.0.1:10000", "The server address in the format of host:port")
 	serverHostOverride = flag.String("server_host_override", "x.test.youtube.com", "The server name use to verify the hostname returned by TLS handshake")
@@ -165,34 +165,34 @@ type myCreds struct {
 }
 
 func (mc *myCreds) ClientHandshake(ctx context.Context, str string, conn net.Conn) (c net.Conn, ai credentials.AuthInfo, err error) {
-		  c, ai, err = mc.TransportCredentials.ClientHandshake(ctx, str, conn)
-		  tlsInfo := ai.(credentials.TLSInfo)
-		  fmt.Printf("\nTLSUnique: %#v\n", tlsInfo.State.TLSUnique)
-		  for _, v := range tlsInfo.State.PeerCertificates {
-					 fmt.Println("\nClient: Server public key is:")
-					 fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-		  }
-		  return
+	c, ai, err = mc.TransportCredentials.ClientHandshake(ctx, str, conn)
+	tlsInfo := ai.(credentials.TLSInfo)
+	fmt.Printf("\nTLSUnique: %#v\n", tlsInfo.State.TLSUnique)
+	for _, v := range tlsInfo.State.PeerCertificates {
+		fmt.Println("\nClient: Server public key is:")
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+	}
+	return
 }
 
 func main() {
 	flag.Parse()
 	var opts []grpc.DialOption
 	if *tlsflag {
-			  var creds credentials.TransportCredentials
-			  cert, err2 := tls.LoadX509KeyPair("testdata/client.pem", "testdata/client.key")
-			  if err2 != nil {
-						 grpclog.Fatalf("Failed to load keys, %v", err2)
-			  }
-			  config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-			  creds = credentials.NewTLS(&config)
-				opts = append(opts, grpc.WithTransportCredentials(&myCreds{creds}))
+		var creds credentials.TransportCredentials
+		cert, err2 := tls.LoadX509KeyPair("testdata/client.pem", "testdata/client.key")
+		if err2 != nil {
+			grpclog.Fatalf("Failed to load keys, %v", err2)
+		}
+		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		creds = credentials.NewTLS(&config)
+		opts = append(opts, grpc.WithTransportCredentials(&myCreds{creds}))
 	} else {
-			  opts = append(opts, grpc.WithInsecure())
+		opts = append(opts, grpc.WithInsecure())
 	}
 	conn, err := grpc.Dial(*serverAddr, opts...)
 	if err != nil {
-			  grpclog.Fatalf("fail to dial: %v", err)
+		grpclog.Fatalf("fail to dial: %v", err)
 	}
 	defer conn.Close()
 	client := pb.NewRouteGuideClient(conn)

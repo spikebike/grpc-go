@@ -38,6 +38,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"flag"
@@ -47,7 +48,6 @@ import (
 	"math"
 	"net"
 	"time"
-	"crypto/tls"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -228,7 +228,7 @@ type myCreds struct {
 func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials.AuthInfo, err error) {
 	c, ai, err = mc.TransportCredentials.ServerHandshake(rawConn)
 	tlsInfo := ai.(credentials.TLSInfo)
-//	fmt.Printf("\ntlsInfo: %#v\n", tlsInfo)
+	//	fmt.Printf("\ntlsInfo: %#v\n", tlsInfo)
 	fmt.Printf("\nTLSUnique: %#v\n", tlsInfo.State.TLSUnique)
 	for _, v := range tlsInfo.State.PeerCertificates {
 		fmt.Println("\nServer: Client public key is:")
@@ -245,17 +245,17 @@ func main() {
 	}
 	var opts []grpc.ServerOption
 	if *tlsflag {
-			  cert, err := tls.LoadX509KeyPair(*certFile,*keyFile)
-			  if err != nil {
-						 grpclog.Fatalf("server: loadkeys: %s", err)
-			  }
-			  config := tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAnyClientCert}
-			  creds := credentials.NewTLS(&config)
-			  if err != nil {
-						 grpclog.Fatalf("Failed to generate credentials %v", err)
-			  }
-			  //opts = []grpc.ServerOption{grpc.Creds(creds)}
-			  opts = []grpc.ServerOption{grpc.Creds(&myCreds{creds})}
+		cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+		if err != nil {
+			grpclog.Fatalf("server: loadkeys: %s", err)
+		}
+		config := tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAnyClientCert}
+		creds := credentials.NewTLS(&config)
+		if err != nil {
+			grpclog.Fatalf("Failed to generate credentials %v", err)
+		}
+		//opts = []grpc.ServerOption{grpc.Creds(creds)}
+		opts = []grpc.ServerOption{grpc.Creds(&myCreds{creds})}
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterRouteGuideServer(grpcServer, newServer())
