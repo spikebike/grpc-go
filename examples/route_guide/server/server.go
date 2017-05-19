@@ -228,7 +228,8 @@ type myCreds struct {
 func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials.AuthInfo, err error) {
 	c, ai, err = mc.TransportCredentials.ServerHandshake(rawConn)
 	tlsInfo := ai.(credentials.TLSInfo)
-	//	fmt.Printf("\ntlsInfo: %#v\n", tlsInfo)
+	// need to update peer DB for peer ID, last_seen, and IP.
+	fmt.Printf("\nIPAddr: %#v\n", rawConn.RemoteAddr().String())
 	fmt.Printf("\nTLSUnique: %#v\n", tlsInfo.State.TLSUnique)
 	for _, v := range tlsInfo.State.PeerCertificates {
 		fmt.Println("\nServer: Client public key is:")
@@ -236,6 +237,20 @@ func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials
 	}
 	return
 }
+
+
+func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		  resp, err := handler(ctx, req)
+		  fmt.Println("\n**** WOO UNARY INTERCEPTED ****\n\n");
+		  return resp, err
+}
+
+func StreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		  fmt.Println("\n**** WOO STREAM INTERCEPTED ****\n\n");
+		  return nil
+}
+
+
 
 func main() {
 	flag.Parse()
@@ -255,7 +270,10 @@ func main() {
 			grpclog.Fatalf("Failed to generate credentials %v", err)
 		}
 		//opts = []grpc.ServerOption{grpc.Creds(creds)}
+		//opts = append(opts,grpc.ServerOption{grpc.Creds(&myCreds{creds})})
 		opts = []grpc.ServerOption{grpc.Creds(&myCreds{creds})}
+		opts = append(opts,grpc.UnaryInterceptor(UnaryServerInterceptor))
+		opts = append(opts,grpc.StreamInterceptor(StreamServerInterceptor))
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterRouteGuideServer(grpcServer, newServer())
