@@ -43,13 +43,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"io"
 	"io/ioutil"
 	"math"
 	"net"
 	"time"
-	"google.golang.org/grpc"
-	"golang.org/x/net/context"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
@@ -237,23 +237,25 @@ func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials
 	return
 }
 
+const peerIDKey = 0
+
 func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		  resp, err := handler(ctx, req)
-		  ip, ok := ctx.Value(0).(int)
-		  if (ok == false ) {
-					 fmt.Println("ok = false\n");
-					 fmt.Printf("ip=%d\n",ip);
-					 ctx.Value(0).(int)=1
-		  }
-		  fmt.Println("\n**** WOO UNARY INTERCEPTED ****\n\n");
-		  // ctx -> Context.value
-		  return resp, err
+	resp, err := handler(ctx, req)
+	ip, ok := ctx.Value(peerIDKey).(int)
+	if ok == false {
+		fmt.Println("ok = false\n")
+		fmt.Printf("ip=%d\n", ip)
+		ctx.Value(peerIDKey).(int) = 1
+	}
+	fmt.Printf("\n**** WOO UNARY INTERCEPTED **** resp=%v resp=%#v\\n\n", resp, resp)
+	// ctx -> Context.value
+	return resp, err
 }
 
 func StreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		  fmt.Println("\n**** WOO STREAM INTERCEPTED ****\n\n");
-		  // need to reference grpc.Serverstream -> stream -> Context() context.Context
-		  return nil
+	fmt.Println("\n**** WOO STREAM INTERCEPTED ****\n\n")
+	// need to reference grpc.Serverstream -> stream -> Context() context.Context
+	return nil
 }
 
 func main() {
@@ -276,8 +278,8 @@ func main() {
 		//opts = []grpc.ServerOption{grpc.Creds(creds)}
 		//opts = append(opts,grpc.ServerOption{grpc.Creds(&myCreds{creds})})
 		opts = []grpc.ServerOption{grpc.Creds(&myCreds{creds})}
-		opts = append(opts,grpc.UnaryInterceptor(UnaryServerInterceptor))
-		opts = append(opts,grpc.StreamInterceptor(StreamServerInterceptor))
+		opts = append(opts, grpc.UnaryInterceptor(UnaryServerInterceptor))
+		opts = append(opts, grpc.StreamInterceptor(StreamServerInterceptor))
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterRouteGuideServer(grpcServer, newServer())
