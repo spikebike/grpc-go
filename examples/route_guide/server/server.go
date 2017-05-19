@@ -48,9 +48,8 @@ import (
 	"math"
 	"net"
 	"time"
-
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"golang.org/x/net/context"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
@@ -238,19 +237,24 @@ func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials
 	return
 }
 
-
 func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		  resp, err := handler(ctx, req)
+		  ip, ok := ctx.Value(0).(int)
+		  if (ok == false ) {
+					 fmt.Println("ok = false\n");
+					 fmt.Printf("ip=%d\n",ip);
+					 ctx.Value(0).(int)=1
+		  }
 		  fmt.Println("\n**** WOO UNARY INTERCEPTED ****\n\n");
+		  // ctx -> Context.value
 		  return resp, err
 }
 
 func StreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		  fmt.Println("\n**** WOO STREAM INTERCEPTED ****\n\n");
+		  // need to reference grpc.Serverstream -> stream -> Context() context.Context
 		  return nil
 }
-
-
 
 func main() {
 	flag.Parse()
