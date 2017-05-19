@@ -74,6 +74,8 @@ type routeGuideServer struct {
 
 // GetFeature returns the feature at the given point.
 func (s *routeGuideServer) GetFeature(ctx context.Context, point *pb.Point) (*pb.Feature, error) {
+	peerID, _  := ctx.Value(peerIDKey).(int)
+	fmt.Printf("GetFeatures peerID=%d\n",peerID)
 	for _, feature := range s.savedFeatures {
 		if proto.Equal(feature.Location, point) {
 			return feature, nil
@@ -240,13 +242,13 @@ func (mc *myCreds) ServerHandshake(rawConn net.Conn) (c net.Conn, ai credentials
 const peerIDKey = 0
 
 func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	resp, err := handler(ctx, req)
 	ip, ok := ctx.Value(peerIDKey).(int)
 	if ok == false {
 		fmt.Println("ok = false\n")
 		fmt.Printf("ip=%d\n", ip)
-		ctx.Value(peerIDKey).(int) = 1
+		ctx = context.WithValue(ctx, peerIDKey, int(1))
 	}
+	resp, err := handler(ctx, req)
 	fmt.Printf("\n**** WOO UNARY INTERCEPTED **** resp=%v resp=%#v\\n\n", resp, resp)
 	// ctx -> Context.value
 	return resp, err
